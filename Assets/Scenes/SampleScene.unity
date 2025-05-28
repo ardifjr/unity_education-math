@@ -1250,7 +1250,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 6, y: -235}
+  m_AnchoredPosition: {x: 6, y: -383.5}
   m_SizeDelta: {x: 168.8149, y: 55.2621}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &244920709
@@ -1829,14 +1829,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   soalText: {fileID: 141937065}
-  jawabanKiriText: {fileID: 194712108}
+  jawabanKiriText: {fileID: 132429913}
   jawabanTengahText: {fileID: 212470368}
-  jawabanKananText: {fileID: 132429913}
+  jawabanKananText: {fileID: 194712108}
   boxKiri: {fileID: 1172233193}
   boxTengah: {fileID: 1686592770}
   boxKanan: {fileID: 2077291450}
   minNumber: 1
-  maxNumber: 20
+  maxNumber: 2
 --- !u!4 &540227933
 Transform:
   m_ObjectHideFlags: 0
@@ -4137,8 +4137,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 2.3774698, y: 2.0015988, z: 4.6715164}
-  m_Center: {x: -0.0000014305115, y: 1.2696393, z: -0.22728789}
+  m_Size: {x: 0.9157198, y: 1.6868417, z: 4.6715164}
+  m_Center: {x: -0.11810225, y: 1.1122615, z: -0.22728784}
 --- !u!114 &7095400624321882700
 MonoBehaviour:
   m_ObjectHideFlags: 0
