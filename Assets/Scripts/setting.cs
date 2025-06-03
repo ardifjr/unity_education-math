@@ -11,4 +11,11 @@ public class OpenSettingPanel : MonoBehaviour
             panelSetting.SetActive(true); // tampilkan panel setting
         }
     }
+    public void ClosePanel()
+    {
+        if (panelSetting != null)
+        {
+            panelSetting.SetActive(false); // sembunyikan panel setting
+        }
+    }
 }
