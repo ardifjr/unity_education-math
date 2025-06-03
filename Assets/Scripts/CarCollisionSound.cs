@@ -24,7 +24,6 @@ public class CarCollisionSound : MonoBehaviour
             Debug.LogError("❌ AUDIO CLIP KOSONG!");
         }
         
-        Debug.Log("✅ CarCollisionSound siap!");
     }
 
     void OnTriggerEnter(Collider other)
@@ -32,11 +31,9 @@ public class CarCollisionSound : MonoBehaviour
         // Cek apakah sudah lewat cooldown time
         if (Time.time - lastSoundTime < cooldownTime)
         {
-            Debug.Log("⏰ Masih cooldown, skip suara");
             return;
         }
         
-        Debug.Log("🎯 TRIGGER: " + other.name);
         
         // Cek apakah yang ditabrak adalah blok
         if (IsBlock(other.gameObject))
@@ -60,7 +57,6 @@ public class CarCollisionSound : MonoBehaviour
     {
         if (collisionSound != null && audioSource != null)
         {
-            Debug.Log("🔊 MAIN SUARA NABRAK!");
             
             // Stop suara sebelumnya jika masih main
             if (audioSource.isPlaying)
