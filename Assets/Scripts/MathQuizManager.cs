@@ -2,43 +2,45 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
-using System.Linq;
+using UnityEngine.SceneManagement;
 
 public class MathQuizManager : MonoBehaviour
 {
     [Header("UI References")]
-    public TextMeshProUGUI soalText; // TMP UI untuk soal
-    public TextMeshPro jawabanKiriText; // TMP 3D object untuk jawaban kiri
-    public TextMeshPro jawabanTengahText; // TMP 3D object untuk jawaban tengah  
-    public TextMeshPro jawabanKananText; // TMP 3D object untuk jawaban kanan
+    public TextMeshProUGUI soalText;
+    public TextMeshProUGUI skorText; // Menampilkan skor selama permainan
+    public TextMeshPro jawabanKiriText;
+    public TextMeshPro jawabanTengahText;
+    public TextMeshPro jawabanKananText;
 
     [Header("Answer Box Objects")]
-    public GameObject boxKiri; // 3D square object untuk box kiri
-    public GameObject boxTengah; // 3D square object untuk box tengah
-    public GameObject boxKanan; // 3D square object untuk box kanan
+    public GameObject boxKiri;
+    public GameObject boxTengah;
+    public GameObject boxKanan;
 
     [Header("Game Settings")]
     public int minNumber = 1;
     public int maxNumber = 20;
 
     private int jawaban_benar;
-    private int posisi_jawaban_benar; // 0=kiri, 1=tengah, 2=kanan
+    private int posisi_jawaban_benar;
     private string soal_sekarang;
     private int skor = 0;
-    private List<int> semua_jawaban_current; // Menyimpan jawaban saat ini
+    private List<int> semua_jawaban_current;
+
+    [Header("Game Over UI")]
+    public GameObject gameOverPanel;
+    public TextMeshProUGUI skorAkhirText; // Tambahan untuk menampilkan skor akhir
 
     void Start()
     {
-        // Setup collision detection untuk setiap box
         SetupCollisionDetection();
-
-        // Generate soal pertama
         GenerateSoal();
+        UpdateSkorUI();
     }
 
     void SetupCollisionDetection()
     {
-        // Pastikan setiap box memiliki collider dan rigidbody
         SetupBoxCollider(boxKiri, 0);
         SetupBoxCollider(boxTengah, 1);
         SetupBoxCollider(boxKanan, 2);
@@ -46,36 +48,27 @@ public class MathQuizManager : MonoBehaviour
 
     void SetupBoxCollider(GameObject box, int boxIndex)
     {
-        // Tambahkan BoxCollider jika belum ada
         if (box.GetComponent<BoxCollider>() == null)
-        {
             box.AddComponent<BoxCollider>();
-        }
 
-        // Set sebagai trigger
         box.GetComponent<BoxCollider>().isTrigger = true;
 
-        // Tambahkan script AnswerBox
         AnswerBox answerBox = box.GetComponent<AnswerBox>();
         if (answerBox == null)
-        {
             answerBox = box.AddComponent<AnswerBox>();
-        }
+
         answerBox.boxIndex = boxIndex;
         answerBox.quizManager = this;
     }
 
     public void GenerateSoal()
     {
-        // Generate dua angka random
         int angka1 = Random.Range(minNumber, maxNumber + 1);
         int angka2 = Random.Range(minNumber, maxNumber + 1);
 
-        // Pilih operator random
         string[] operators = { "+", "-", "×", "÷" };
         string operator_terpilih = operators[Random.Range(0, operators.Length)];
 
-        // Hitung jawaban benar
         switch (operator_terpilih)
         {
             case "+":
@@ -83,7 +76,6 @@ public class MathQuizManager : MonoBehaviour
                 soal_sekarang = $"{angka1} + {angka2} = ?";
                 break;
             case "-":
-                // Pastikan hasil tidak negatif
                 if (angka1 < angka2)
                 {
                     int temp = angka1;
@@ -98,52 +90,36 @@ public class MathQuizManager : MonoBehaviour
                 soal_sekarang = $"{angka1} × {angka2} = ?";
                 break;
             case "÷":
-                // Pastikan pembagian bersisa 0
-                angka1 = angka1 * angka2; // Membuat angka1 bisa dibagi angka2
+                angka1 = angka1 * angka2;
                 jawaban_benar = angka1 / angka2;
                 soal_sekarang = $"{angka1} ÷ {angka2} = ?";
                 break;
         }
 
-        // Update soal di UI
         soalText.text = soal_sekarang;
 
-        // Generate jawaban salah
         List<int> semua_jawaban = GenerateJawabanSalah();
-
-        // Acak posisi jawaban benar
         posisi_jawaban_benar = Random.Range(0, 3);
         semua_jawaban[posisi_jawaban_benar] = jawaban_benar;
-
-        // Simpan jawaban saat ini untuk referensi
         semua_jawaban_current = new List<int>(semua_jawaban);
 
-        // Update jawaban di UI
         jawabanKiriText.text = semua_jawaban[0].ToString();
         jawabanTengahText.text = semua_jawaban[1].ToString();
         jawabanKananText.text = semua_jawaban[2].ToString();
-
-        Debug.Log($"Soal: {soal_sekarang}");
-        Debug.Log($"Jawaban benar: {jawaban_benar} (posisi: {GetPosisiNama(posisi_jawaban_benar)})");
     }
 
     List<int> GenerateJawabanSalah()
     {
         List<int> jawaban_salah = new List<int>();
 
-        // Generate 2 jawaban salah yang berbeda dari jawaban benar
         while (jawaban_salah.Count < 3)
         {
-            int jawaban_random;
-
-            // Generate jawaban salah dengan range yang masuk akal
             int range = Mathf.Max(5, jawaban_benar / 2);
-            jawaban_random = Random.Range(
+            int jawaban_random = Random.Range(
                 Mathf.Max(0, jawaban_benar - range),
                 jawaban_benar + range + 1
             );
 
-            // Pastikan tidak sama dengan jawaban benar dan belum ada dalam list
             if (jawaban_random != jawaban_benar && !jawaban_salah.Contains(jawaban_random))
             {
                 jawaban_salah.Add(jawaban_random);
@@ -155,70 +131,60 @@ public class MathQuizManager : MonoBehaviour
 
     public void OnAnswerSelected(int boxIndex)
     {
-        // Dapatkan nilai jawaban yang dipilih
         int jawaban_dipilih = semua_jawaban_current[boxIndex];
-        string posisi_nama = GetPosisiNama(boxIndex);
-
-        // Print informasi box yang ditabrak dan nilainya
-        Debug.Log($"Menabrak box {posisi_nama}, jawaban: {jawaban_dipilih}");
 
         if (boxIndex == posisi_jawaban_benar)
         {
-            // Jawaban benar
             skor++;
-            Debug.Log($"Benar! Skor: {skor}");
-
-            // Generate soal baru
+            UpdateSkorUI();
             GenerateSoal();
         }
         else
         {
-            // Jawaban salah - Game Over
-            Debug.Log("GAME OVER!");
-            Debug.Log($"Jawaban yang benar adalah: {jawaban_benar} ({GetPosisiNama(posisi_jawaban_benar)})");
-            Debug.Log($"Skor akhir: {skor}");
-
-            // Bisa tambahkan logic game over di sini
             GameOver();
         }
     }
 
+    void UpdateSkorUI()
+    {
+        if (skorText != null)
+            skorText.text = $"Skor: {skor}";
+    }
+
     void GameOver()
     {
-        // Disable car movement atau logic game over lainnya
         Car carScript = FindFirstObjectByType<Car>();
         if (carScript != null)
         {
             carScript.enabled = false;
         }
 
-        // Bisa tambahkan UI game over, restart button, dll
-        soalText.text = $"GAME OVER! Skor: {skor}";
+        soalText.text = $"GAME OVER!";
+
+        if (skorAkhirText != null)
+            skorAkhirText.text = $"Skor Akhir: {skor}";
+
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(true);
     }
 
-    string GetPosisiNama(int posisi)
-    {
-        switch (posisi)
-        {
-            case 0: return "Kiri";
-            case 1: return "Tengah";
-            case 2: return "Kanan";
-            default: return "Unknown";
-        }
-    }
-
-    // Method untuk restart game
     public void RestartGame()
     {
         skor = 0;
 
-        // Enable car movement
         Car carScript = FindFirstObjectByType<Car>();
         if (carScript != null)
-        {
             carScript.enabled = true;
-        }
 
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(false);
+
+        UpdateSkorUI();
         GenerateSoal();
+    }
+
+    public void BackToHome()
+    {
+        SceneManager.LoadScene("home"); // Ganti dengan nama scene kamu
     }
 }
