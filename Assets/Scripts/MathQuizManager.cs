@@ -31,6 +31,17 @@ public class MathQuizManager : MonoBehaviour
     public int maxNumber = 20;
     public int coinPerCorrectAnswer = 10; // Koin per jawaban benar
 
+    [Header("Speed Control Settings")]
+    public Animator roadAnimator; // Reference ke Animator untuk jalan/loop
+    public string speedParameterName = "Speed"; // Nama parameter speed di Animator
+    public float baseSpeed = 0.3f; // Kecepatan dasar
+    public float speedIncrement = 0.1f; // Peningkatan speed per jawaban benar berturut-turut
+    public float maxSpeed = 2.0f; // Kecepatan maksimum
+    public int correctAnswersForSpeedIncrease = 1; // Berapa jawaban benar untuk menaikkan speed
+    
+    [Header("Speed UI (Optional)")]
+    public TextMeshProUGUI speedDisplayText; // Text untuk menampilkan kecepatan saat ini
+
     [Header("Scene Names")]
     public string homeSceneName = "HomeScene"; // Nama scene home
 
@@ -41,12 +52,67 @@ public class MathQuizManager : MonoBehaviour
     private int totalEarnings = 0; // Total pendapatan
     private List<int> semua_jawaban_current; // Menyimpan jawaban saat ini
     private bool isProcessingAnswer = false; // Flag untuk mencegah multiple hits
+    
+    // Speed control variables
+    private int consecutiveCorrectAnswers = 0; // Jawaban benar berturut-turut
+    private float currentSpeed; // Kecepatan saat ini
 
     void Start()
     {
         SetupUI();
         SetupCollisionDetection();
+        InitializeSpeedControl();
         StartCoroutine(GenerateSoalCoroutine());
+    }
+
+    void InitializeSpeedControl()
+    {
+        currentSpeed = baseSpeed;
+        UpdateAnimatorSpeed();
+        UpdateSpeedDisplay();
+    }
+
+    void UpdateAnimatorSpeed()
+    {
+        if (roadAnimator != null)
+        {
+            roadAnimator.SetFloat(speedParameterName, currentSpeed);
+            Debug.Log($"Animator speed updated to: {currentSpeed}");
+        }
+    }
+
+    void UpdateSpeedDisplay()
+    {
+        if (speedDisplayText != null)
+        {
+            speedDisplayText.text = $"Speed: {currentSpeed:F1}x";
+        }
+    }
+
+    void IncreaseSpeed()
+    {
+        consecutiveCorrectAnswers++;
+        
+        // Hitung speed baru berdasarkan jawaban benar berturut-turut
+        if (consecutiveCorrectAnswers % correctAnswersForSpeedIncrease == 0)
+        {
+            float newSpeed = baseSpeed + (speedIncrement * (consecutiveCorrectAnswers / correctAnswersForSpeedIncrease));
+            currentSpeed = Mathf.Min(newSpeed, maxSpeed);
+            
+            UpdateAnimatorSpeed();
+            UpdateSpeedDisplay();
+            
+            Debug.Log($"Speed increased! Consecutive correct: {consecutiveCorrectAnswers}, New speed: {currentSpeed}");
+        }
+    }
+
+    void ResetSpeed()
+    {
+        consecutiveCorrectAnswers = 0;
+        currentSpeed = baseSpeed;
+        UpdateAnimatorSpeed();
+        UpdateSpeedDisplay();
+        Debug.Log("Speed reset to base speed");
     }
 
     void SetupUI()
@@ -73,6 +139,7 @@ public class MathQuizManager : MonoBehaviour
         SetupBoxCollider(boxTengah, 1);
         SetupBoxCollider(boxKanan, 2);
     }
+    
     void SetupBoxCollider(GameObject box, int boxIndex)
     {
         if (box.GetComponent<BoxCollider>() == null)
@@ -92,6 +159,7 @@ public class MathQuizManager : MonoBehaviour
         answerBox.boxIndex = boxIndex;
         answerBox.quizManager = this;
     }
+    
     IEnumerator GenerateSoalCoroutine()
     {
         isProcessingAnswer = false;
@@ -102,6 +170,7 @@ public class MathQuizManager : MonoBehaviour
         
         Debug.Log("Soal baru siap!");
     }
+    
     public void GenerateSoal()
     {
         int angka1 = Random.Range(minNumber, maxNumber + 1);
@@ -143,6 +212,7 @@ public class MathQuizManager : MonoBehaviour
         Debug.Log($"Jawaban benar: {jawaban_benar} (posisi: {GetPosisiNama(posisi_jawaban_benar)})");
         Debug.Log($"Semua jawaban: [{semua_jawaban_current[0]}, {semua_jawaban_current[1]}, {semua_jawaban_current[2]}]");
     }
+    
     void UpdateUI()
     {
         if (soalText != null)
@@ -208,6 +278,7 @@ public class MathQuizManager : MonoBehaviour
         {
             skor++;
             totalEarnings += coinPerCorrectAnswer;
+            IncreaseSpeed(); // Tingkatkan kecepatan untuk jawaban benar
             Debug.Log($"BENAR! Skor: {skor}, Pendapatan: {totalEarnings}");
             StartCoroutine(GenerateSoalCoroutine());
         }
@@ -217,6 +288,7 @@ public class MathQuizManager : MonoBehaviour
             Debug.Log($"Jawaban yang benar adalah: {jawaban_benar} ({GetPosisiNama(posisi_jawaban_benar)})");
             Debug.Log($"Skor akhir: {skor}");
             Debug.Log($"Pendapatan akhir: {totalEarnings}");
+            ResetSpeed(); // Reset kecepatan saat game over
             isProcessingAnswer = false;
             GameOver();
         }
@@ -258,11 +330,14 @@ public class MathQuizManager : MonoBehaviour
             default: return "Unknown";
         }
     }
+    
     public void RestartGame()
     {
         skor = 0;
         totalEarnings = 0;
         isProcessingAnswer = false;
+        ResetSpeed(); // Reset kecepatan saat restart
+        
         if (gameOverPanel != null)
         {
             gameOverPanel.SetActive(false);
@@ -279,6 +354,7 @@ public class MathQuizManager : MonoBehaviour
     {
         SceneManager.LoadScene(homeSceneName);
     }
+    
     [ContextMenu("Debug Current State")]
     public void DebugCurrentState()
     {
@@ -294,5 +370,19 @@ public class MathQuizManager : MonoBehaviour
         Debug.Log($"UI Texts: [{jawabanKiriText?.text}, {jawabanTengahText?.text}, {jawabanKananText?.text}]");
         Debug.Log($"Is Processing: {isProcessingAnswer}");
         Debug.Log($"Skor: {skor}, Pendapatan: {totalEarnings}");
+        Debug.Log($"Current Speed: {currentSpeed}, Consecutive Correct: {consecutiveCorrectAnswers}");
+    }
+
+    // Method untuk testing speed control
+    [ContextMenu("Test Increase Speed")]
+    public void TestIncreaseSpeed()
+    {
+        IncreaseSpeed();
+    }
+
+    [ContextMenu("Test Reset Speed")]
+    public void TestResetSpeed()
+    {
+        ResetSpeed();
     }
 }
