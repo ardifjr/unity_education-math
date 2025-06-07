@@ -5,7 +5,11 @@ public class SceneChanger : MonoBehaviour
 {
     public void LoadPlayGameScene()
     {
-        Debug.Log("Button Clicked");
         SceneManager.LoadScene("SampleScene");
+    }
+    
+    public void Back()
+    {
+        SceneManager.LoadScene("landingPage");
     }
 }
