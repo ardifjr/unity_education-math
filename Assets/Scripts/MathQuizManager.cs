@@ -45,6 +45,9 @@ public class MathQuizManager : MonoBehaviour
     [Header("Scene Names")]
     public string homeSceneName = "HomeScene"; // Nama scene home
 
+    [Header("Countdown Integration")]
+    public CountdownManager countdownManager; // Reference ke CountdownManager
+
     private int jawaban_benar;
     private int posisi_jawaban_benar; // 0=kiri, 1=tengah, 2=kanan
     private string soal_sekarang;
@@ -52,6 +55,7 @@ public class MathQuizManager : MonoBehaviour
     private int totalEarnings = 0; // Total pendapatan
     private List<int> semua_jawaban_current; // Menyimpan jawaban saat ini
     private bool isProcessingAnswer = false; // Flag untuk mencegah multiple hits
+    private bool gameStarted = false; // Flag untuk mengetahui apakah game sudah dimulai
     
     // Speed control variables
     private int consecutiveCorrectAnswers = 0; // Jawaban benar berturut-turut
@@ -61,6 +65,33 @@ public class MathQuizManager : MonoBehaviour
     {
         SetupUI();
         SetupCollisionDetection();
+        InitializeSpeedControl();
+        
+        // Jangan langsung mulai generate soal
+        // Tunggu countdown selesai atau trigger manual
+        if (countdownManager != null)
+        {
+            // Auto start countdown setelah delay singkat
+            StartCoroutine(AutoStartCountdown());
+        }
+        else
+        {
+            // Jika tidak ada countdown manager, langsung mulai
+            StartGame();
+        }
+    }
+
+    IEnumerator AutoStartCountdown()
+    {
+        yield return new WaitForSeconds(1f); // Delay 1 detik
+        countdownManager.StartCountdown();
+    }
+
+    // Method ini dipanggil oleh CountdownManager
+    public void StartGame()
+    {
+        gameStarted = true;
+        Debug.Log("Math Quiz Game Started!");
         InitializeSpeedControl();
         StartCoroutine(GenerateSoalCoroutine());
     }
@@ -73,13 +104,33 @@ public class MathQuizManager : MonoBehaviour
     }
 
     void UpdateAnimatorSpeed()
+{
+    if (roadAnimator != null)
     {
-        if (roadAnimator != null)
+        // PERBAIKAN: Hapus kondisi gameStarted agar bisa dipanggil kapan saja
+        roadAnimator.SetFloat(speedParameterName, currentSpeed);
+        
+        // TAMBAHAN: Set speed property juga
+        roadAnimator.speed = 1f; // Pastikan animator speed = 1 agar parameter bisa bekerja
+        
+        Debug.Log($"Animator speed updated - Parameter: {speedParameterName} = {currentSpeed}, Speed property = 1f");
+        
+        // TAMBAHAN: Debug animator state untuk troubleshooting
+        if (roadAnimator.gameObject.activeInHierarchy)
         {
-            roadAnimator.SetFloat(speedParameterName, currentSpeed);
-            Debug.Log($"Animator speed updated to: {currentSpeed}");
+            Debug.Log($"Animator is active and enabled: {roadAnimator.enabled}");
+            Debug.Log($"Animator controller: {roadAnimator.runtimeAnimatorController?.name}");
+        }
+        else
+        {
+            Debug.LogWarning("Animator GameObject is not active in hierarchy!");
         }
     }
+    else
+    {
+        Debug.LogError("roadAnimator is null!");
+    }
+}
 
     void UpdateSpeedDisplay()
     {
@@ -162,6 +213,12 @@ public class MathQuizManager : MonoBehaviour
     
     IEnumerator GenerateSoalCoroutine()
     {
+        // Pastikan game sudah dimulai
+        if (!gameStarted)
+        {
+            yield break;
+        }
+        
         isProcessingAnswer = false;
         yield return null;
         GenerateSoal();
@@ -173,6 +230,9 @@ public class MathQuizManager : MonoBehaviour
     
     public void GenerateSoal()
     {
+        // Pastikan game sudah dimulai
+        if (!gameStarted) return;
+        
         int angka1 = Random.Range(minNumber, maxNumber + 1);
         int angka2 = Random.Range(minNumber, maxNumber + 1);
         string[] operators = { "+", "-", "×", "÷" };
@@ -259,6 +319,9 @@ public class MathQuizManager : MonoBehaviour
 
     public void OnAnswerSelected(int boxIndex)
     {
+        // Pastikan game sudah dimulai
+        if (!gameStarted) return;
+        
         if (isProcessingAnswer)
         {
             return;
@@ -296,11 +359,20 @@ public class MathQuizManager : MonoBehaviour
 
     void GameOver()
     {
+        gameStarted = false; // Stop game
+        
         Car carScript = FindFirstObjectByType<Car>();
         if (carScript != null)
         {
             carScript.enabled = false;
         }
+        
+        // Stop road animation
+        if (roadAnimator != null)
+        {
+            roadAnimator.speed = 0f;
+        }
+        
         if (gameOverPanel != null)
         {
             gameOverPanel.SetActive(true);
@@ -336,29 +408,57 @@ public class MathQuizManager : MonoBehaviour
         skor = 0;
         totalEarnings = 0;
         isProcessingAnswer = false;
+        gameStarted = false; // Reset game state
         ResetSpeed(); // Reset kecepatan saat restart
         
         if (gameOverPanel != null)
         {
             gameOverPanel.SetActive(false);
         }
+        
         Car carScript = FindFirstObjectByType<Car>();
         if (carScript != null)
         {
-            carScript.enabled = true;
+            carScript.enabled = false; // Disable sampai countdown selesai
         }
-        StartCoroutine(GenerateSoalCoroutine());
+        
+        // Stop road animation
+        if (roadAnimator != null)
+        {
+            roadAnimator.speed = 0f;
+        }
+        
+        // Restart countdown
+        if (countdownManager != null)
+        {
+            countdownManager.StartCountdown();
+        }
+        else
+        {
+            // Jika tidak ada countdown, langsung mulai
+            StartGame();
+        }
     }
 
     public void GoToHome()
     {
         SceneManager.LoadScene(homeSceneName);
     }
+
+    // Method untuk trigger manual countdown (jika diperlukan)
+    public void TriggerCountdown()
+    {
+        if (countdownManager != null)
+        {
+            countdownManager.StartCountdown();
+        }
+    }
     
     [ContextMenu("Debug Current State")]
     public void DebugCurrentState()
     {
         Debug.Log($"=== DEBUG STATE ===");
+        Debug.Log($"Game Started: {gameStarted}");
         Debug.Log($"Soal: {soal_sekarang}");
         Debug.Log($"Jawaban benar: {jawaban_benar} (posisi: {GetPosisiNama(posisi_jawaban_benar)})");
         
@@ -373,7 +473,6 @@ public class MathQuizManager : MonoBehaviour
         Debug.Log($"Current Speed: {currentSpeed}, Consecutive Correct: {consecutiveCorrectAnswers}");
     }
 
-    // Method untuk testing speed control
     [ContextMenu("Test Increase Speed")]
     public void TestIncreaseSpeed()
     {
