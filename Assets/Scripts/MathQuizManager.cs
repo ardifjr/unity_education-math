@@ -58,6 +58,20 @@ public class MathQuizManager : MonoBehaviour
     public Vector3 initialBoxKiriPosition;
     public Vector3 initialBoxTengahPosition;
     public Vector3 initialBoxKananPosition;
+    [Header("Slow Barrel Settings")]
+    public GameObject slowParent; // Parent object "slow"
+    public GameObject barrelKiri; // Tong kayu kiri
+    public GameObject barrelTengah; // Tong kayu tengah
+    public GameObject barrelKanan; // Tong kayu kanan
+    public float speedReduction = 0.2f; // Pengurangan speed saat nabrak tong
+    public float minSpawnTime = 3f; // Waktu minimum spawn tong (detik)
+    public float maxSpawnTime = 8f; // Waktu maksimum spawn tong (detik)
+    public float barrelVisibleDuration = 5f; // Durasi tong terlihat (detik)
+
+    // TAMBAHKAN variable private ini:
+    private Coroutine barrelSpawnCoroutine;
+    private bool isBarrelActive = false;
+    private GameObject currentActiveBarrel;
 
     private int jawaban_benar;
     private int posisi_jawaban_benar; // 0=kiri, 1=tengah, 2=kanan
@@ -68,8 +82,6 @@ public class MathQuizManager : MonoBehaviour
     private bool isProcessingAnswer = false; // Flag untuk mencegah multiple hits
     private bool gameStarted = false; // Flag untuk mengetahui apakah game sudah dimulai
     private bool isGameOver = false; // Flag untuk status game over
-
-    // Speed control variables
     private int consecutiveCorrectAnswers = 0; // Jawaban benar berturut-turut
     private float currentSpeed; // Kecepatan saat ini
 
@@ -99,7 +111,8 @@ public class MathQuizManager : MonoBehaviour
         SetupCollisionDetection();
         InitializeSpeedControl();
         ResetGameVariables();
-        SaveInitialPositions(); // TAMBAHKAN INI
+        SaveInitialPositions();
+        SetupBarrelColliders();
 
         if (countdownManager != null)
         {
@@ -116,8 +129,36 @@ public class MathQuizManager : MonoBehaviour
         yield return new WaitForSeconds(1f); // Delay 1 detik
         countdownManager.StartCountdown();
     }
+    void SetupBarrelColliders()
+    {
+        SetupBarrelCollider(barrelKiri, 0);
+        SetupBarrelCollider(barrelTengah, 1);
+        SetupBarrelCollider(barrelKanan, 2);
+    }
 
-    // Method ini dipanggil oleh CountdownManager
+    void SetupBarrelCollider(GameObject barrel, int barrelIndex)
+    {
+        if (barrel == null) return;
+
+        if (barrel.GetComponent<BoxCollider>() == null)
+        {
+            barrel.AddComponent<BoxCollider>();
+        }
+
+        barrel.GetComponent<BoxCollider>().isTrigger = true;
+
+        // Tambahkan script SlowBarrel
+        SlowBarrel slowBarrel = barrel.GetComponent<SlowBarrel>();
+        if (slowBarrel == null)
+        {
+            slowBarrel = barrel.AddComponent<SlowBarrel>();
+        }
+        slowBarrel.barrelIndex = barrelIndex;
+        slowBarrel.quizManager = this;
+
+        // Pastikan tong tidak terlihat di awal
+        barrel.SetActive(false);
+    }
     public void StartGame()
     {
         gameStarted = true;
@@ -139,6 +180,7 @@ public class MathQuizManager : MonoBehaviour
         }
 
         StartCoroutine(GenerateSoalCoroutine());
+        StartBarrelSpawning();
     }
 
     void InitializeSpeedControl()
@@ -417,11 +459,156 @@ public class MathQuizManager : MonoBehaviour
         }
     }
 
+    void StartBarrelSpawning()
+    {
+        if (barrelSpawnCoroutine != null)
+        {
+            StopCoroutine(barrelSpawnCoroutine);
+        }
+        barrelSpawnCoroutine = StartCoroutine(BarrelSpawnCoroutine());
+    }
+
+    void StopBarrelSpawning()
+    {
+        if (barrelSpawnCoroutine != null)
+        {
+            StopCoroutine(barrelSpawnCoroutine);
+            barrelSpawnCoroutine = null;
+        }
+        HideAllBarrels();
+    }
+
+    IEnumerator BarrelSpawnCoroutine()
+    {
+        while (gameStarted && !isGameOver)
+        {
+            // Tunggu waktu random sebelum spawn tong
+            float waitTime = Random.Range(minSpawnTime, maxSpawnTime);
+            yield return new WaitForSeconds(waitTime);
+
+            // Pastikan game masih berjalan
+            if (!gameStarted || isGameOver) break;
+
+            // Spawn tong jika tidak ada yang aktif
+            if (!isBarrelActive)
+            {
+                SpawnRandomBarrel();
+            }
+        }
+    }
+
+    void SpawnRandomBarrel()
+    {
+        if (isBarrelActive) return;
+
+        GameObject[] barrels = { barrelKiri, barrelTengah, barrelKanan };
+
+        // Pilih tong secara random
+        int randomIndex = Random.Range(0, barrels.Length);
+        GameObject selectedBarrel = barrels[randomIndex];
+
+        if (selectedBarrel != null)
+        {
+            selectedBarrel.SetActive(true);
+            currentActiveBarrel = selectedBarrel;
+            isBarrelActive = true;
+
+            Debug.Log($"Barrel spawned at position: {GetBarrelPositionName(randomIndex)}");
+
+            // Mulai coroutine untuk menyembunyikan tong setelah durasi tertentu
+            StartCoroutine(HideBarrelAfterDuration());
+        }
+    }
+
+    IEnumerator HideBarrelAfterDuration()
+    {
+        yield return new WaitForSeconds(barrelVisibleDuration);
+
+        if (isBarrelActive && currentActiveBarrel != null)
+        {
+            currentActiveBarrel.SetActive(false);
+            currentActiveBarrel = null;
+            isBarrelActive = false;
+            Debug.Log("Barrel hidden after duration");
+        }
+    }
+
+    void HideAllBarrels()
+    {
+        if (barrelKiri != null) barrelKiri.SetActive(false);
+        if (barrelTengah != null) barrelTengah.SetActive(false);
+        if (barrelKanan != null) barrelKanan.SetActive(false);
+
+        currentActiveBarrel = null;
+        isBarrelActive = false;
+    }
+
+    public void OnBarrelHit(int barrelIndex)
+    {
+        if (!gameStarted || isGameOver || !isBarrelActive) return;
+
+        Debug.Log($"=== BARREL HIT ===");
+        Debug.Log($"Hit barrel at position: {GetBarrelPositionName(barrelIndex)}");
+
+        // Kurangi speed
+        ReduceSpeed();
+
+        // Sembunyikan tong yang ditabrak
+        GameObject hitBarrel = GetBarrelByIndex(barrelIndex);
+        if (hitBarrel != null)
+        {
+            hitBarrel.SetActive(false);
+        }
+
+        currentActiveBarrel = null;
+        isBarrelActive = false;
+
+        Debug.Log($"Speed reduced! Current speed: {currentSpeed}");
+    }
+
+    void ReduceSpeed()
+    {
+        // Reset consecutive correct answers karena nabrak tong
+        consecutiveCorrectAnswers = 0;
+
+        // Kurangi speed tapi tidak boleh kurang dari minimum
+        float newSpeed = currentSpeed - speedReduction;
+        currentSpeed = Mathf.Max(newSpeed, baseSpeed * 0.5f); // Minimum 50% dari base speed
+
+        UpdateAnimatorSpeed();
+        UpdateSpeedDisplay();
+
+        Debug.Log($"Speed reduced by {speedReduction}. New speed: {currentSpeed}");
+    }
+
+    GameObject GetBarrelByIndex(int index)
+    {
+        switch (index)
+        {
+            case 0: return barrelKiri;
+            case 1: return barrelTengah;
+            case 2: return barrelKanan;
+            default: return null;
+        }
+    }
+
+    string GetBarrelPositionName(int index)
+    {
+        switch (index)
+        {
+            case 0: return "Kiri";
+            case 1: return "Tengah";
+            case 2: return "Kanan";
+            default: return "Unknown";
+        }
+    }
+
+
     void GameOver()
     {
         isGameOver = true;
         gameStarted = false;
-
+        StopBarrelSpawning();
         // Stop background music
         if (backgroundMusicSource != null && backgroundMusicSource.isPlaying)
         {
@@ -538,7 +725,8 @@ public class MathQuizManager : MonoBehaviour
         ResetGameVariables();
         ResetSpeed();
         isGameOver = false;
-
+        StopBarrelSpawning(); 
+        HideAllBarrels();
         if (gameOverPanel != null)
         {
             gameOverPanel.SetActive(false);
