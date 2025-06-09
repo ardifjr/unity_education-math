@@ -45,7 +45,15 @@ public class MathQuizManager : MonoBehaviour
     public int correctAnswersForSpeedIncrease = 1; // Berapa jawaban benar untuk menaikkan speed
 
     [Header("Speed UI (Optional)")]
-    public TextMeshProUGUI speedDisplayText; // Text untuk menampilkan kecepatan saat ini
+    public TextMeshProUGUI speedDisplayText; // Text untuk menampilkan kecepatan saat ini (optional)
+
+    [Header("Speedometer Settings")]
+    public Transform speedometerNeedle; // Transform panah speedometer (drag panah merah PNG ke sini)
+    public float minNeedleAngle = -90f; // Sudut minimum panah (kiri)
+    public float maxNeedleAngle = 90f;  // Sudut maksimum panah (kanan)
+    public float needleRotationSpeed = 2f;
+    [Tooltip("Jika panah berputar terbalik, centang ini")]
+    public bool invertNeedleRotation = false;
 
     [Header("Scene Names")]
     public string homeSceneName = "HomeScene"; // Nama scene home
@@ -72,7 +80,8 @@ public class MathQuizManager : MonoBehaviour
     private Coroutine barrelSpawnCoroutine;
     private bool isBarrelActive = false;
     private GameObject currentActiveBarrel;
-
+    private float targetNeedleAngle = 0f;
+    private float currentNeedleAngle = 0f;
     private int jawaban_benar;
     private int posisi_jawaban_benar; // 0=kiri, 1=tengah, 2=kanan
     private string soal_sekarang;
@@ -221,12 +230,63 @@ public class MathQuizManager : MonoBehaviour
 
     void UpdateSpeedDisplay()
     {
+        // Update text display (optional)
         if (speedDisplayText != null)
         {
             speedDisplayText.text = $"Speed: {currentSpeed:F1}x";
         }
-    }
 
+        // Update speedometer needle
+        UpdateSpeedometer();
+    }
+    void UpdateSpeedometer()
+    {
+        if (speedometerNeedle != null)
+        {
+            // Hitung persentase speed berdasarkan range (baseSpeed sampai maxSpeed)
+            // Gunakan speed minimum yang mungkin (baseSpeed * 0.5f) sebagai minimum range
+            float minPossibleSpeed = baseSpeed * 0.5f; // Sesuai dengan ReduceSpeed()
+            float speedPercentage = Mathf.InverseLerp(minPossibleSpeed, maxSpeed, currentSpeed);
+
+            // Clamp percentage untuk memastikan dalam range 0-1
+            speedPercentage = Mathf.Clamp01(speedPercentage);
+
+            // Konversi persentase ke sudut panah
+            targetNeedleAngle = Mathf.Lerp(minNeedleAngle, maxNeedleAngle, speedPercentage);
+
+            Debug.Log($"Speed: {currentSpeed:F1}, Min: {minPossibleSpeed:F1}, Max: {maxSpeed:F1}, Percentage: {speedPercentage:F2}, Target Angle: {targetNeedleAngle:F1}");
+        }
+    }
+    void Update()
+    {
+        // Smooth rotation untuk panah speedometer
+        if (speedometerNeedle != null && !isGameOver)
+        {
+            // Lerp ke target angle untuk smooth movement
+            currentNeedleAngle = Mathf.LerpAngle(currentNeedleAngle, targetNeedleAngle,
+                Time.deltaTime * needleRotationSpeed);
+
+            // Apply rotasi ke panah (rotasi pada sumbu Z)
+            // Jika invertNeedleRotation true, balik arah rotasi
+            float finalAngle = invertNeedleRotation ? -currentNeedleAngle : currentNeedleAngle;
+            speedometerNeedle.rotation = Quaternion.Euler(0, 0, finalAngle);
+        }
+    }
+    void ResetSpeedometer()
+    {
+        if (speedometerNeedle != null)
+        {
+            // Reset ke sudut minimum (speed terendah)
+            float minPossibleSpeed = baseSpeed * 0.5f;
+            float speedPercentage = Mathf.InverseLerp(minPossibleSpeed, maxSpeed, baseSpeed);
+            targetNeedleAngle = Mathf.Lerp(minNeedleAngle, maxNeedleAngle, speedPercentage);
+            currentNeedleAngle = targetNeedleAngle;
+
+            float finalAngle = invertNeedleRotation ? -currentNeedleAngle : currentNeedleAngle;
+            speedometerNeedle.rotation = Quaternion.Euler(0, 0, finalAngle);
+            Debug.Log($"Speedometer reset - Angle: {finalAngle:F1}");
+        }
+    }
     void IncreaseSpeed()
     {
         consecutiveCorrectAnswers++;
@@ -266,9 +326,11 @@ public class MathQuizManager : MonoBehaviour
         consecutiveCorrectAnswers = 0;
         currentSpeed = baseSpeed;
 
+        // Reset speedometer
+        ResetSpeedometer();
+
         Debug.Log("All game variables reset");
     }
-
     void SetupUI()
     {
         if (gameOverPanel != null)
@@ -638,7 +700,7 @@ public class MathQuizManager : MonoBehaviour
             roadAnimator.SetFloat(speedParameterName, 0f);
             Debug.Log("Road animation stopped completely");
         }
-
+        ResetSpeedometer();
         // Stop all other animations in scene
         StopAllAnimations();
 
@@ -725,7 +787,7 @@ public class MathQuizManager : MonoBehaviour
         ResetGameVariables();
         ResetSpeed();
         isGameOver = false;
-        StopBarrelSpawning(); 
+        StopBarrelSpawning();
         HideAllBarrels();
         if (gameOverPanel != null)
         {
