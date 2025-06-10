@@ -34,7 +34,7 @@ public class MathQuizManager : MonoBehaviour
     [Header("Game Settings")]
     public int minNumber = 1;
     public int maxNumber = 20;
-    public int coinPerCorrectAnswer = 10; // Koin per jawaban benar
+    public int coinPerCorrectAnswer = 5; // Koin per jawaban benar
 
     [Header("Speed Control Settings")]
     public Animator roadAnimator; // Reference ke Animator untuk jalan/loop
@@ -75,6 +75,16 @@ public class MathQuizManager : MonoBehaviour
     public float minSpawnTime = 3f; // Waktu minimum spawn tong (detik)
     public float maxSpawnTime = 8f; // Waktu maksimum spawn tong (detik)
     public float barrelVisibleDuration = 5f; // Durasi tong terlihat (detik)
+    [Header("High Score Integration")]
+    [Tooltip("Referensi ke HighScoreManager - akan auto-assign saat runtime")]
+    private HighScoreManager highScoreManager;
+
+    [Header("New High Score UI")]
+    public GameObject newHighScorePanel; // Panel untuk menampilkan "NEW HIGH SCORE!"
+    public TextMeshProUGUI newHighScoreText; // Text untuk "NEW HIGH SCORE!"
+    public AudioClip newHighScoreClip; // Sound effect untuk high score baru
+
+    private bool isNewHighScore = false;
 
     // TAMBAHKAN variable private ini:
     private Coroutine barrelSpawnCoroutine;
@@ -122,7 +132,7 @@ public class MathQuizManager : MonoBehaviour
         ResetGameVariables();
         SaveInitialPositions();
         SetupBarrelColliders();
-
+        SetupHighScoreManager();
         if (countdownManager != null)
         {
             StartCoroutine(AutoStartCountdown());
@@ -665,12 +675,36 @@ public class MathQuizManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Setup High Score Manager
+    /// </summary>
+    void SetupHighScoreManager()
+    {
+        // Cari atau buat HighScoreManager
+        highScoreManager = HighScoreManager.Instance;
 
+        if (highScoreManager == null)
+        {
+            // Jika tidak ada, buat GameObject baru dengan HighScoreManager
+            GameObject highScoreObj = new GameObject("HighScoreManager");
+            highScoreManager = highScoreObj.AddComponent<HighScoreManager>();
+            Debug.Log("HighScoreManager created automatically");
+        }
+        else
+        {
+            Debug.Log("HighScoreManager found and connected");
+        }
+    }
+
+    /// <summary>
+    /// Update method GameOver() yang sudah ada
+    /// </summary>
     void GameOver()
     {
         isGameOver = true;
         gameStarted = false;
         StopBarrelSpawning();
+        CheckAndUpdateHighScore();
         // Stop background music
         if (backgroundMusicSource != null && backgroundMusicSource.isPlaying)
         {
@@ -714,6 +748,120 @@ public class MathQuizManager : MonoBehaviour
         }
 
         Debug.Log("=== GAME OVER - ALL ACTIVITIES STOPPED ===");
+    }
+    void CheckAndUpdateHighScore()
+    {
+        if (highScoreManager != null)
+        {
+            isNewHighScore = highScoreManager.UpdateScore(totalEarnings);
+
+            if (isNewHighScore)
+            {
+                Debug.Log($"🎉 NEW HIGH SCORE! Previous: {highScoreManager.GetHighScore() - totalEarnings}, New: {totalEarnings}");
+
+                // Set flag untuk home scene
+                PlayerPrefs.SetInt("IsNewHighScore", 1);
+                PlayerPrefs.Save();
+
+                // Play new high score sound instead of game over sound
+                if (gameOverSoundSource != null && newHighScoreClip != null)
+                {
+                    gameOverSoundSource.PlayOneShot(newHighScoreClip);
+                    Debug.Log("New high score sound played");
+                }
+            }
+            else
+            {
+                Debug.Log($"Score: {totalEarnings}, High Score remains: {highScoreManager.GetHighScore()}");
+            }
+        }
+        else
+        {
+            Debug.LogError("HighScoreManager not found! High score won't be saved.");
+        }
+    }
+    /// <summary>
+    /// Sequence untuk menampilkan high score baru
+    /// </summary>
+    IEnumerator ShowNewHighScoreSequence()
+    {
+        // Tampilkan panel new high score dulu
+        if (newHighScorePanel != null)
+        {
+            yield return StartCoroutine(ShowNewHighScorePanel());
+
+            // Tunggu beberapa detik untuk memberi waktu player melihat
+            yield return new WaitForSeconds(2f);
+
+            // Sembunyikan panel new high score
+            newHighScorePanel.SetActive(false);
+        }
+
+        // Baru tampilkan game over panel
+        yield return StartCoroutine(ShowGameOverPanel());
+    }
+
+    /// <summary>
+    /// Tampilkan panel new high score
+    /// </summary>
+    IEnumerator ShowNewHighScorePanel()
+    {
+        if (newHighScorePanel != null)
+        {
+            // Set scale ke 0 terlebih dahulu
+            newHighScorePanel.transform.localScale = Vector3.zero;
+            newHighScorePanel.SetActive(true);
+
+            // Update text
+            if (newHighScoreText != null)
+            {
+                newHighScoreText.text = $"NEW HIGH SCORE!\n{skor}";
+            }
+
+            // Animasi scale dengan bounce effect
+            float duration = 0.8f;
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float progress = elapsed / duration;
+
+                // Bounce effect
+                float scale = Mathf.Lerp(0f, 1.2f, progress);
+                if (progress > 0.7f)
+                {
+                    scale = Mathf.Lerp(1.2f, 1f, (progress - 0.7f) / 0.3f);
+                }
+
+                newHighScorePanel.transform.localScale = Vector3.one * scale;
+                yield return null;
+            }
+
+            newHighScorePanel.transform.localScale = Vector3.one;
+        }
+    }
+    public void TestHighScore()
+    {
+        if (highScoreManager != null)
+        {
+            Debug.Log($"Current High Score: {highScoreManager.GetHighScore()}");
+            Debug.Log($"Current Session Score: {skor}");
+
+            // Test dengan score tinggi
+            bool isNew = highScoreManager.UpdateScore(totalEarnings);
+            Debug.Log($"Test score {totalEarnings} - Is new high score: {isNew}");
+        }
+    }
+
+    [ContextMenu("Reset High Score")]
+    public void ResetHighScore()
+    {
+        if (highScoreManager != null)
+        {
+            highScoreManager.ResetHighScore();
+            Debug.Log("High Score reset to 0");
+        }
     }
     void ResetCarPosition()
     {

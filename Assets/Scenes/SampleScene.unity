@@ -3674,6 +3674,9 @@ MonoBehaviour:
   minSpawnTime: 6
   maxSpawnTime: 15
   barrelVisibleDuration: 3
+  newHighScorePanel: {fileID: 0}
+  newHighScoreText: {fileID: 0}
+  newHighScoreClip: {fileID: 0}
 --- !u!4 &540227933
 Transform:
   m_ObjectHideFlags: 0
@@ -7336,7 +7339,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Score : 0'
+  m_text: 'Total Score: 0'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -17769,12 +17772,12 @@ SceneRoots:
   - {fileID: 410087041}
   - {fileID: 889938434}
   - {fileID: 1818181815}
+  - {fileID: 66312830}
   - {fileID: 2086897591}
   - {fileID: 1237646949}
   - {fileID: 540227933}
   - {fileID: 1057810319}
   - {fileID: 1506193127}
   - {fileID: 665083019}
-  - {fileID: 66312830}
   - {fileID: 1225885736}
   - {fileID: 1098452232}
